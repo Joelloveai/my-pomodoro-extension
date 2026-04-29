@@ -1,20 +1,24 @@
 {
     "manifest_version": 3,
     "name": "Focus Pomodoro",
-    "version": "1.0",
-    "description": "Pomodoro timer with site blocking for better studying",
-    "permissions": ["storage", "alarms", "notifications", "tabs", "declarativeNetRequest"],
+    "version": "2.0.0",
+    "description": "Smart Pomodoro timer with site blocking, idle detection, focus score, and more",
+    "permissions": [
+      "storage",
+      "alarms",
+      "notifications",
+      "tabs",
+      "declarativeNetRequest",
+      "idle",
+      "offscreen"
+    ],
     "host_permissions": ["<all_urls>"],
     "background": {
       "service_worker": "background.js"
     },
     "action": {
       "default_popup": "popup.html",
-      "default_title": "Focus Pomodoro",
-      "default_icon": {
-        "16": "icons/icon16.png",
-        "32": "icons/icon32.png"
-      }
+      "default_title": "Focus Pomodoro"
     },
     "options_page": "options.html",
     "declarative_net_request": {

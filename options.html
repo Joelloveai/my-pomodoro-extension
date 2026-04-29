@@ -1,90 +1,120 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="UTF-8">
-  <title>Pomodoro Extension Options</title>
+  <title>Focus Pomodoro Options</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      margin: 24px;
-      max-width: 420px;
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 30px;
+      max-width: 500px;
+      background: #f8f9fa;
+    }
+    .card {
+      background: white;
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    h2 {
+      margin-top: 0;
     }
     .input-group {
-      margin-bottom: 18px;
+      margin-bottom: 20px;
     }
     label {
       display: block;
-      margin-bottom: 4px;
+      font-weight: 600;
+      margin-bottom: 6px;
     }
     input[type="number"] {
-      width: 80px;
-      margin-right: 8px;
+      width: 100px;
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    .flex-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
     }
     #blocked-list {
-      margin: 0;
-      padding: 0;
       list-style: none;
-      max-height: 120px;
-      overflow-y: auto;
-      margin-bottom: 8px;
+      padding: 0;
+      margin: 10px 0;
     }
     #blocked-list li {
+      background: #f1f3f5;
+      margin: 6px 0;
+      padding: 6px 12px;
+      border-radius: 20px;
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      margin-bottom: 4px;
     }
-    #blocked-list button {
-      margin-left: 8px;
-      background: #e55353;
+    button {
+      background: #2c3e66;
       color: white;
       border: none;
-      border-radius: 3px;
-      padding: 2px 8px;
+      border-radius: 8px;
+      padding: 6px 14px;
       cursor: pointer;
     }
-    #add-blocked {
-      margin-left: 6px;
-      padding: 2px 8px;
-    }
-    #save-btn {
-      margin-top: 18px;
-      padding: 7px 18px;
-      background: #4caf50;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      font-size: 15px;
-      cursor: pointer;
+    button:hover {
+      background: #1e2a4a;
     }
     .message {
-      margin-top: 14px;
+      margin-top: 12px;
       font-size: 14px;
-      color: #248624;
+    }
+    .score-box {
+      background: #e9ecef;
+      border-radius: 16px;
+      padding: 12px;
+      text-align: center;
     }
   </style>
 </head>
 <body>
-  <h2>Pomodoro Timer Options</h2>
+  <div class="card">
+    <h2>⚙️ Focus Pomodoro Settings</h2>
 
-  <div class="input-group">
-    <label for="work-minutes">Work Minutes</label>
-    <input type="number" id="work-minutes" min="1" max="180" value="25">
+    <div class="input-group">
+      <label>🍅 Work duration (minutes)</label>
+      <input type="number" id="work-minutes" min="1" max="180" value="25">
+    </div>
+
+    <div class="input-group">
+      <label>☕ Break duration (minutes)</label>
+      <input type="number" id="break-minutes" min="1" max="60" value="5">
+    </div>
+
+    <div class="input-group">
+      <label>🔇 Sound notifications</label>
+      <div class="flex-row">
+        <label style="font-weight: normal;"><input type="radio" name="sound" value="on" checked> On</label>
+        <label style="font-weight: normal;"><input type="radio" name="sound" value="off"> Off</label>
+      </div>
+    </div>
+
+    <div class="input-group">
+      <label>🚫 Blocked websites (e.g., youtube.com)</label>
+      <div class="flex-row">
+        <input type="text" id="blocked-site" placeholder="example.com" style="flex:1">
+        <button id="add-blocked">Add</button>
+      </div>
+      <ul id="blocked-list"></ul>
+    </div>
+
+    <button id="save-btn">Save Settings</button>
+    <div class="message" id="message"></div>
   </div>
 
-  <div class="input-group">
-    <label for="break-minutes">Break Minutes</label>
-    <input type="number" id="break-minutes" min="1" max="60" value="5">
+  <div class="card score-box">
+    🔥 Your Focus Score: <strong id="focus-score">0</strong>/100
+    <div style="font-size:12px; margin-top:6px;">Based on last 30 days of completed Pomodoros and streaks.</div>
   </div>
-
-  <div class="input-group">
-    <label for="blocked-site">Blocked Websites</label>
-    <ul id="blocked-list"></ul>
-    <input type="text" id="blocked-site" placeholder="e.g. facebook.com">
-    <button id="add-blocked" type="button">Add</button>
-  </div>
-
-  <button id="save-btn" type="button">Save</button>
-  <div class="message" id="message"></div>
 
   <script src="options.js"></script>
 </body>
