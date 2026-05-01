@@ -1,4 +1,3 @@
-// DOM elements
 const timerEl = document.getElementById("timer");
 const startBtn = document.getElementById("startBtn");
 const pauseBtn = document.getElementById("pauseBtn");
@@ -9,24 +8,38 @@ const taskListEl = document.getElementById("taskList");
 const sessionsTodaySpan = document.getElementById("sessionsToday");
 const focusMinutesSpan = document.getElementById("focusMinutes");
 const motivationSpan = document.getElementById("motivationMsg");
-const breakSuggestionDiv = document.getElementById("breakSuggestion");
 const suggestionTextSpan = document.getElementById("suggestionText");
+const breakSuggestionDiv = document.getElementById("breakSuggestion");
 const exportBtn = document.getElementById("exportBtn");
 const optionsLink = document.getElementById("optionsLink");
+const openDashboardBtn = document.getElementById("openDashboardBtn");
+const feedbackPrompt = document.getElementById("feedbackPrompt");
+const ratingButtons = document.getElementById("ratingButtons");
+const proBadge = document.getElementById("proBadge");
 
+let previousState = null;
 let currentState = {
-  workDuration: 25 * 60,
-  breakDuration: 5 * 60,
+  workDuration: 1500,
+  breakDuration: 300,
   isWorkSession: true,
-  timeLeft: 25 * 60,
+  timeLeft: 1500,
   isRunning: false,
-  currentTask: ""
+  currentTask: "",
+  pomodoroIndex: 0
 };
 
-function formatTime(sec) {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatTime(seconds) {
+  const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const ss = String(seconds % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+async function send(type, payload = {}) {
+  return chrome.runtime.sendMessage({ type, ...payload });
 }
 
 function updateTimerDisplay() {
@@ -35,22 +48,20 @@ function updateTimerDisplay() {
   pauseBtn.disabled = !currentState.isRunning;
 }
 
-// ---------- Daily tasks (persisted per day) ----------
-function getTodayKey() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 async function getDailyTasks() {
-  const res = await chrome.storage.local.get({ pomodoroTasks: {} });
-  const all = res.pomodoroTasks || {};
-  return all[getTodayKey()] || [];
+  const data = await chrome.storage.local.get({ pomodoroTasks: {} });
+  return data.pomodoroTasks[todayKey()] || [];
 }
 
 async function setDailyTasks(tasks) {
-  const res = await chrome.storage.local.get({ pomodoroTasks: {} });
-  const all = res.pomodoroTasks || {};
-  all[getTodayKey()] = tasks;
-  await chrome.storage.local.set({ pomodoroTasks: all });
+  const data = await chrome.storage.local.get({ pomodoroTasks: {} });
+  data.pomodoroTasks[todayKey()] = tasks;
+  await chrome.storage.local.set({ pomodoroTasks: data.pomodoroTasks });
+}
+
+async function saveCurrentTask(task) {
+  await chrome.storage.local.set({ currentTask: task });
+  currentState.currentTask = task;
 }
 
 async function renderTasks() {
@@ -59,37 +70,36 @@ async function renderTasks() {
   tasks.forEach((task, idx) => {
     const li = document.createElement("li");
     li.className = `task-item${task.completed ? " completed" : ""}`;
-    const span = document.createElement("span");
-    span.textContent = task.text;
-    span.style.cursor = "pointer";
-    span.onclick = () => {
+
+    const label = document.createElement("span");
+    label.textContent = task.text;
+    label.onclick = async () => {
       taskInput.value = task.text;
-      saveCurrentTask(task.text);
+      await saveCurrentTask(task.text);
     };
-    const btnDiv = document.createElement("div");
-    btnDiv.className = "task-buttons";
-    const doneBtn = document.createElement("button");
-    doneBtn.textContent = task.completed ? "Undo" : "Done";
-    doneBtn.className = "task-btn";
-    doneBtn.onclick = async () => {
+
+    const actions = document.createElement("div");
+    actions.className = "task-buttons";
+    const done = document.createElement("button");
+    done.className = "task-btn";
+    done.textContent = task.completed ? "Undo" : "Done";
+    done.onclick = async () => {
       tasks[idx].completed = !tasks[idx].completed;
       await setDailyTasks(tasks);
-      renderTasks();
-      updateDailyStats();
+      await renderTasks();
+      await updateDailyStats();
     };
-    const delBtn = document.createElement("button");
-    delBtn.textContent = "✖";
-    delBtn.className = "task-btn";
-    delBtn.onclick = async () => {
+    const del = document.createElement("button");
+    del.className = "task-btn";
+    del.textContent = "X";
+    del.onclick = async () => {
       tasks.splice(idx, 1);
       await setDailyTasks(tasks);
-      renderTasks();
-      updateDailyStats();
+      await renderTasks();
+      await updateDailyStats();
     };
-    btnDiv.appendChild(doneBtn);
-    btnDiv.appendChild(delBtn);
-    li.appendChild(span);
-    li.appendChild(btnDiv);
+    actions.append(done, del);
+    li.append(label, actions);
     taskListEl.appendChild(li);
   });
 }
@@ -102,103 +112,124 @@ async function addTask() {
   await setDailyTasks(tasks);
   await saveCurrentTask(text);
   taskInput.value = "";
-  renderTasks();
-  updateDailyStats();
+  await renderTasks();
 }
 
-async function saveCurrentTask(task) {
-  await chrome.storage.local.set({ currentTask: task });
-  currentState.currentTask = task;
-}
-
-// ---------- Dashboard stats ----------
 async function updateDailyStats() {
-  const analytics = await chrome.runtime.sendMessage({ type: "getAnalytics" }) || { sessions: [] };
+  const analytics = (await send("getAnalytics")) || { sessions: [] };
   const today = new Date().toDateString();
-  const todaySessions = analytics.sessions.filter(s => s.type === "work" && new Date(s.timestamp).toDateString() === today);
-  const completed = todaySessions.filter(s => s.completed).length;
-  const totalMinutes = completed * 25;
-  sessionsTodaySpan.innerText = completed;
-  focusMinutesSpan.innerText = totalMinutes;
-  let msg = "";
-  if (completed === 0) msg = "✨ Start your first Pomodoro";
-  else if (completed < 4) msg = `🌱 ${completed}/4 sessions`;
-  else if (completed < 8) msg = "🔥 Keep burning!";
-  else msg = "🏆 Legendary focus!";
-  motivationSpan.innerText = msg;
+  const sessions = analytics.sessions.filter(
+    (x) => x.type === "work" && new Date(x.timestamp).toDateString() === today && x.completed
+  );
+  sessionsTodaySpan.textContent = String(sessions.length);
+  focusMinutesSpan.textContent = String(sessions.length * 25);
+  if (sessions.length === 0) motivationSpan.textContent = "Start your first focus block";
+  else if (sessions.length < 4) motivationSpan.textContent = `${sessions.length}/4 target`;
+  else motivationSpan.textContent = "Great momentum";
 }
 
-// ---------- Break suggestions ----------
-const exercises = [
-  "Look away from screen for 20 sec.",
-  "Roll your shoulders 10 times.",
-  "Take 3 deep belly breaths.",
-  "Stretch your arms upward.",
-  "Massage your temples.",
-  "Hydrate – drink water."
-];
-function showBreakSuggestion() {
-  const random = exercises[Math.floor(Math.random() * exercises.length)];
-  suggestionTextSpan.innerText = random;
-  breakSuggestionDiv.style.display = "block";
-  setTimeout(() => breakSuggestionDiv.style.display = "none", 8000);
-}
-
-// ---------- CSV export ----------
 async function exportCSV() {
-  const analytics = await chrome.runtime.sendMessage({ type: "getAnalytics" });
-  const sessions = analytics.sessions || [];
-  let csv = "Timestamp,Type,Task,Completed\n";
-  sessions.forEach(s => {
-    csv += `"${s.timestamp}",${s.type},"${s.task.replace(/"/g, '""')}",${s.completed}\n`;
-  });
-  const blob = new Blob([csv], { type: "text/csv" });
+  const analytics = (await send("getAnalytics")) || { sessions: [] };
+  const header = "Timestamp,Type,Task,Completed,Distractions,Rating\n";
+  const body = analytics.sessions
+    .map(
+      (s) =>
+        `"${s.timestamp}",${s.type},"${String(s.task || "").replace(/"/g, '""')}",${Boolean(s.completed)},${Number(
+          s.distractions || 0
+        )},${s.rating ?? ""}`
+    )
+    .join("\n");
+  const blob = new Blob([header + body], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
-  await chrome.downloads.download({ url, filename: `pomodoro_export_${Date.now()}.csv` });
+  await chrome.downloads.download({ url, filename: `focus-pomodoro-${Date.now()}.csv` });
   URL.revokeObjectURL(url);
 }
 
-// ---------- State sync with background ----------
-async function fetchState() {
-  const resp = await chrome.runtime.sendMessage({ type: "getState" });
-  if (resp && resp.success) {
-    currentState = { ...currentState, ...resp.state };
-    updateTimerDisplay();
-    taskInput.value = currentState.currentTask || "";
+async function loadPremiumBadge() {
+  const premium = await send("premium_state");
+  proBadge.textContent = premium && premium.isPremium ? "Pro" : "Free";
+}
+
+function showBreakSuggestion() {
+  const list = [
+    "Look 20 feet away for 20 seconds.",
+    "Take 3 deep breaths.",
+    "Stand and stretch shoulders."
+  ];
+  suggestionTextSpan.textContent = list[Math.floor(Math.random() * list.length)];
+  breakSuggestionDiv.style.display = "block";
+  setTimeout(() => {
+    breakSuggestionDiv.style.display = "none";
+  }, 6000);
+}
+
+async function showFocusRatingPrompt() {
+  feedbackPrompt.classList.remove("hidden");
+  ratingButtons.innerHTML = "";
+  for (let i = 1; i <= 5; i += 1) {
+    const btn = document.createElement("button");
+    btn.textContent = String(i);
+    btn.onclick = async () => {
+      feedbackPrompt.classList.add("hidden");
+      await send("record_focus_feedback", {
+        payload: {
+          rating: i,
+          taskType: currentState.currentTask ? "task" : "general",
+          distractions: 0,
+          pomodoroIndex: currentState.pomodoroIndex
+        }
+      });
+    };
+    ratingButtons.appendChild(btn);
   }
 }
 
-function send(type, extra = {}) {
-  return chrome.runtime.sendMessage({ type, ...extra });
+async function fetchState() {
+  const resp = await send("getState");
+  if (resp && resp.success) {
+    previousState = { ...currentState };
+    currentState = { ...currentState, ...resp.state };
+    taskInput.value = currentState.currentTask || "";
+    updateTimerDisplay();
+  }
 }
 
-// ---------- Event listeners ----------
 startBtn.onclick = async () => {
   await saveCurrentTask(taskInput.value.trim());
   await send("start");
-  fetchState();
+  await fetchState();
 };
-pauseBtn.onclick = async () => { await send("stop"); fetchState(); };
-resetBtn.onclick = async () => { await send("reset"); fetchState(); };
+pauseBtn.onclick = async () => {
+  await send("stop");
+  await fetchState();
+};
+resetBtn.onclick = async () => {
+  await send("reset");
+  await fetchState();
+};
 addTaskBtn.onclick = addTask;
-taskInput.onkeydown = (e) => { if (e.key === "Enter") addTask(); };
-taskInput.onblur = () => saveCurrentTask(taskInput.value.trim());
+taskInput.onkeydown = (e) => {
+  if (e.key === "Enter") addTask();
+};
+taskInput.onblur = async () => {
+  await saveCurrentTask(taskInput.value.trim());
+};
 exportBtn.onclick = exportCSV;
 optionsLink.onclick = () => chrome.runtime.openOptionsPage();
+openDashboardBtn.onclick = () => chrome.tabs.create({ url: chrome.runtime.getURL("dashboard.html") });
 
-// Listen for background updates
-chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === "state_update") {
-    currentState = { ...currentState, ...msg.state };
-    updateTimerDisplay();
-    if (!currentState.isWorkSession && currentState.isRunning && currentState.timeLeft === currentState.breakDuration) {
-      showBreakSuggestion();
-    }
-    updateDailyStats();
+chrome.runtime.onMessage.addListener(async (msg) => {
+  if (msg.type !== "state_update") return;
+  previousState = { ...currentState };
+  currentState = { ...currentState, ...msg.state };
+  updateTimerDisplay();
+  await updateDailyStats();
+  if (previousState && previousState.isWorkSession && !currentState.isWorkSession) {
+    showBreakSuggestion();
+    await showFocusRatingPrompt();
   }
 });
 
-// Local fallback tick (every second for smooth UI)
 setInterval(() => {
   if (currentState.isRunning && currentState.timeLeft > 0) {
     currentState.timeLeft -= 1;
@@ -206,9 +237,9 @@ setInterval(() => {
   }
 }, 1000);
 
-// Initial load
 (async () => {
   await fetchState();
   await renderTasks();
   await updateDailyStats();
+  await loadPremiumBadge();
 })();

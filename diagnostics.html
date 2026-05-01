@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Focus Pomodoro Diagnostics</title>
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; margin: 20px; background: #0b1020; color: #e5e7eb; }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+    .ok { color: #10b981; } .warn { color: #f59e0b; } .bad { color: #ef4444; }
+    button { border: 1px solid #374151; background: #1f2937; color: #fff; border-radius: 8px; padding: 8px 12px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Diagnostics</h1>
+  <button id="run">Run checks</button>
+  <div id="results"></div>
+  <script src="diagnostics.js"></script>
+</body>
+</html>
+

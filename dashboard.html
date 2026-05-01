@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Focus Pomodoro Dashboard</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Focus Pomodoro Analytics Dashboard</h1>
+      <div>
+        <button id="refreshBtn">Refresh</button>
+        <button id="downloadPdfBtn">Export PDF</button>
+      </div>
+    </header>
+
+    <section class="cards">
+      <article><span>Focus Score</span><strong id="focusScore">0</strong></article>
+      <article><span>Sessions (30d)</span><strong id="sessionCount">0</strong></article>
+      <article><span>Completion Rate</span><strong id="completionRate">0%</strong></article>
+      <article><span>Best Hour</span><strong id="bestHour">-</strong></article>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <h2>Weekly Trend</h2>
+        <canvas id="weeklyChart" width="600" height="180"></canvas>
+      </article>
+      <article class="panel">
+        <h2>Hourly Heatmap</h2>
+        <canvas id="hourlyChart" width="600" height="180"></canvas>
+      </article>
+      <article class="panel">
+        <h2>AI Summary</h2>
+        <p id="aiSummary"></p>
+        <ul id="aiTips"></ul>
+      </article>
+      <article class="panel">
+        <h2>Workspace Leaderboard</h2>
+        <ul id="leaderboard"></ul>
+      </article>
+    </section>
+  </main>
+  <script src="dashboard.js"></script>
+</body>
+</html>
+

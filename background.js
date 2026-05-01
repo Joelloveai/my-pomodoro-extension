@@ -1,113 +1,77 @@
-// ==================== FOCUS ANALYTICS ====================
-const ANALYTICS_STORAGE_KEY = "pomodoroAnalytics";
+importScripts("focus-analytics.js", "license.js", "pro-services.js", "workspace-sync.js");
 
-async function getAnalytics() {
-  const result = await chrome.storage.local.get(ANALYTICS_STORAGE_KEY);
-  return result[ANALYTICS_STORAGE_KEY] || { sessions: [] };
-}
-
-async function saveAnalytics(data) {
-  await chrome.storage.local.set({ [ANALYTICS_STORAGE_KEY]: data });
-}
-
-async function logSession(isWorkSession, taskName, completed = true) {
-  const analytics = await getAnalytics();
-  analytics.sessions.push({
-    timestamp: new Date().toISOString(),
-    type: isWorkSession ? "work" : "break",
-    task: taskName || "",
-    completed: Boolean(completed)
-  });
-  if (analytics.sessions.length > 2000) analytics.sessions = analytics.sessions.slice(-2000);
-  await saveAnalytics(analytics);
-}
-
-function startOfDay(date) {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function computeLongestStreak(workSessions) {
-  if (!workSessions.length) return 0;
-  const uniqueDays = new Set(workSessions.map(s => startOfDay(s.timestamp).toISOString()));
-  const sorted = Array.from(uniqueDays).map(d => new Date(d)).sort((a, b) => a - b);
-  let longest = 1, current = 1;
-  for (let i = 1; i < sorted.length; i++) {
-    const diff = Math.round((sorted[i] - sorted[i - 1]) / 86400000);
-    if (diff === 1) {
-      current++;
-      longest = Math.max(longest, current);
-    } else {
-      current = 1;
-    }
-  }
-  return longest;
-}
-
-function computeTaskCompletionRate(workSessions) {
-  const withTasks = workSessions.filter(s => s.task && s.task.trim().length > 0);
-  if (!withTasks.length) return 0;
-  const completed = withTasks.filter(s => s.completed).length;
-  return completed / withTasks.length;
-}
-
-async function calculateFocusScore() {
-  const analytics = await getAnalytics();
-  const workSessions = analytics.sessions.filter(s => s.type === "work");
-  const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
-  const recentCompleted = workSessions.filter(s => s.completed && new Date(s.timestamp) >= thirtyDaysAgo).length;
-  const countScore = Math.min(50, Math.round((recentCompleted / 60) * 50));
-  const streakScore = Math.min(30, computeLongestStreak(workSessions.filter(s => s.completed)) * 3);
-  const completionRate = computeTaskCompletionRate(workSessions);
-  const completionScore = Math.round(completionRate * 20);
-  return Math.min(100, countScore + streakScore + completionScore);
-}
-
-// ==================== TIMER STATE ====================
 const DEFAULT_WORK = 25 * 60;
 const DEFAULT_BREAK = 5 * 60;
-const ALARM_TICK = "pomodoro_tick";
+const TIMER_ALARM = "pomodoro_tick";
+const KEEP_ALIVE_ALARM = "fp_keepalive";
 
-async function getState() {
-  const data = await chrome.storage.local.get([
-    "workDuration", "breakDuration", "isWorkSession",
-    "timeLeft", "isRunning", "currentTask"
-  ]);
-  return {
-    workDuration: data.workDuration ?? DEFAULT_WORK,
-    breakDuration: data.breakDuration ?? DEFAULT_BREAK,
-    isWorkSession: data.isWorkSession ?? true,
-    timeLeft: data.timeLeft ?? DEFAULT_WORK,
-    isRunning: data.isRunning ?? false,
-    currentTask: data.currentTask ?? ""
-  };
+async function getTimerState() {
+  const state = await chrome.storage.local.get({
+    workDuration: DEFAULT_WORK,
+    breakDuration: DEFAULT_BREAK,
+    isWorkSession: true,
+    timeLeft: DEFAULT_WORK,
+    isRunning: false,
+    currentTask: "",
+    pomodoroIndex: 0
+  });
+  return state;
 }
 
-async function setState(partial) {
-  await chrome.storage.local.set(partial);
+async function setTimerState(patch) {
+  await chrome.storage.local.set(patch);
 }
 
 async function notifyPopup() {
-  const state = await getState();
-  chrome.runtime.sendMessage({ type: "state_update", state }).catch(() => {});
+  const state = await getTimerState();
+  await chrome.runtime.sendMessage({ type: "state_update", state }).catch(() => {});
 }
 
 function startTicking() {
-  // Chrome alarms do not reliably support very small periodic intervals.
-  // Use a one-shot tick and re-schedule on each alarm callback.
-  chrome.alarms.create(ALARM_TICK, { when: Date.now() + 1000 });
+  chrome.alarms.create(TIMER_ALARM, { when: Date.now() + 1000 });
 }
 
 function stopTicking() {
-  chrome.alarms.clear(ALARM_TICK);
+  chrome.alarms.clear(TIMER_ALARM);
 }
 
-// ==================== DYNAMIC RULES ====================
-async function updateDynamicRules() {
-  const { blockedSites = [] } = await chrome.storage.sync.get("blockedSites");
-  const rules = blockedSites.map((site, idx) => ({
+async function ensureOffscreenDocument() {
+  try {
+    await chrome.offscreen.createDocument({
+      url: "offscreen.html",
+      reasons: ["AUDIO_PLAYBACK"],
+      justification: "Session transition sounds"
+    });
+  } catch (_e) {
+    // Already open or unavailable.
+  }
+}
+
+async function applySyncDurations() {
+  const sync = await chrome.storage.sync.get({ workMinutes: 25, breakMinutes: 5 });
+  const timer = await getTimerState();
+  const workDuration = Math.max(1, Number(sync.workMinutes) || 25) * 60;
+  const breakDuration = Math.max(1, Number(sync.breakMinutes) || 5) * 60;
+  const patch = { workDuration, breakDuration };
+  if (!timer.isRunning) patch.timeLeft = timer.isWorkSession ? workDuration : breakDuration;
+  await setTimerState(patch);
+}
+
+async function updateSmartBlockingRules(isWorkSession) {
+  const settings = await chrome.storage.sync.get({ blockedSites: [] });
+  const pro = await getProSettings();
+  const domains = new Set((settings.blockedSites || []).map((d) => String(d).toLowerCase()));
+
+  if (pro.smartBlocking && isWorkSession) {
+    const discovered = ["youtube.com", "facebook.com", "reddit.com", "twitter.com", "x.com"];
+    discovered.forEach((domain) => {
+      if (classifyDomainDistractionLevel(domain, pro.strictness) === "very_distracting") {
+        domains.add(domain);
+      }
+    });
+  }
+
+  const rules = [...domains].slice(0, 200).map((site, idx) => ({
     id: idx + 1,
     priority: 1,
     action: { type: "block" },
@@ -116,180 +80,233 @@ async function updateDynamicRules() {
       resourceTypes: ["main_frame"]
     }
   }));
-  const existingRules = await chrome.declarativeNetRequest.getDynamicRules();
-  const oldIds = existingRules.map(r => r.id);
+  const existing = await chrome.declarativeNetRequest.getDynamicRules();
   await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: oldIds,
+    removeRuleIds: existing.map((r) => r.id),
     addRules: rules
   });
 }
 
-// ==================== IDLE DETECTION (only if permission exists) ====================
-if (chrome.idle) {
-  let wasRunningBeforeIdle = false;
-  chrome.idle.setDetectionInterval(15);
-  chrome.idle.onStateChanged.addListener(async (newState) => {
-    const state = await getState();
-    if (newState === "idle" && state.isRunning) {
-      wasRunningBeforeIdle = true;
-      await setState({ isRunning: false });
-      stopTicking();
-      notifyPopup();
-      chrome.notifications.create("idlePause", {
-        type: "basic",
-        iconUrl: "icons/icon128.png",
-        title: "Timer paused due to inactivity",
-        message: "You were away. Resume when you're back?",
-        buttons: [{ title: "Resume" }, { title: "Reset" }]
-      });
-    } else if (newState === "active" && wasRunningBeforeIdle) {
-      wasRunningBeforeIdle = false;
-    }
-  });
+async function publishTeamStatus(state) {
+  const score = await calculateFocusScore();
+  await syncTeamSnapshot({
+    status: state.isRunning ? (state.isWorkSession ? "focusing" : "break") : "idle",
+    timeLeft: state.timeLeft,
+    completedToday: state.pomodoroIndex,
+    weeklyFocusScore: score
+  }).catch(() => {});
+}
 
-  chrome.notifications.onButtonClicked.addListener(async (notifId, btnIndex) => {
-    if (notifId === "idlePause") {
-      if (btnIndex === 0) {
-        const state = await getState();
-        if (!state.isRunning && state.timeLeft > 0) {
-          await setState({ isRunning: true });
-          startTicking();
-          notifyPopup();
-        }
-      } else if (btnIndex === 1) {
-        const state = await getState();
-        const newTime = state.isWorkSession ? state.workDuration : state.breakDuration;
-        await setState({ timeLeft: newTime, isRunning: false });
-        stopTicking();
-        notifyPopup();
-      }
-      chrome.notifications.clear(notifId);
-    }
+async function triggerSessionCompletionWorkflows(stateBefore) {
+  const score = await calculateFocusScore();
+  await notifyIntegrations("session_completed", {
+    message: `Completed work session for task "${stateBefore.currentTask || "Untitled"}". Score: ${score}`,
+    startTime: new Date(Date.now() - stateBefore.workDuration * 1000).toISOString(),
+    endTime: new Date().toISOString()
   });
 }
 
-// ==================== ALARM ====================
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name !== ALARM_TICK) return;
-  const state = await getState();
-  if (!state.isRunning) {
-    stopTicking();
+  if (alarm.name === KEEP_ALIVE_ALARM) {
+    const timer = await getTimerState();
+    if (timer.isRunning) startTicking();
     return;
   }
+  if (alarm.name !== TIMER_ALARM) return;
 
-  let { timeLeft, isWorkSession, workDuration, breakDuration, currentTask } = state;
-  if (timeLeft <= 1) {
-    if (isWorkSession) {
-      await logSession(true, currentTask, true);
+  const state = await getTimerState();
+  if (!state.isRunning) return;
+
+  const nextTime = state.timeLeft - 1;
+  if (nextTime <= 0) {
+    const nextIsWorkSession = !state.isWorkSession;
+    if (state.isWorkSession) {
+      await logSession(true, state.currentTask, true);
+      await triggerSessionCompletionWorkflows(state);
     }
-    const nextIsWork = !isWorkSession;
-    const nextTime = nextIsWork ? workDuration : breakDuration;
-    await setState({ isWorkSession: nextIsWork, timeLeft: nextTime });
-    notifyPopup();
+    await setTimerState({
+      isWorkSession: nextIsWorkSession,
+      timeLeft: nextIsWorkSession ? state.workDuration : state.breakDuration,
+      pomodoroIndex: state.isWorkSession ? state.pomodoroIndex + 1 : state.pomodoroIndex
+    });
+    await updateSmartBlockingRules(nextIsWorkSession);
     chrome.notifications.create({
       type: "basic",
       iconUrl: "icons/icon128.png",
-      title: nextIsWork ? "Work session started" : "Break time!",
-      message: nextIsWork ? "Back to focus." : "Stand up, stretch, hydrate."
+      title: nextIsWorkSession ? "Work Session Started" : "Break Time",
+      message: nextIsWorkSession ? "Back to deep work." : "Take a short recovery break."
     });
-    // Attempt sound only if offscreen API exists (permission)
-    if (chrome.offscreen) {
-      try {
-        await chrome.offscreen.createDocument({
-          url: "offscreen.html",
-          reasons: ["AUDIO_PLAYBACK"],
-          justification: "Play notification sound"
-        });
-        chrome.runtime.sendMessage({ type: "playBeep" });
-      } catch(e) {}
+    const sync = await chrome.storage.sync.get({ soundEnabled: true });
+    const pro = await getProSettings();
+    if (sync.soundEnabled) {
+      await ensureOffscreenDocument();
+      chrome.runtime.sendMessage({
+        type: "playBeep",
+        volume: Number(pro.soundVolume || 0.4)
+      }).catch(() => {});
     }
   } else {
-    await setState({ timeLeft: timeLeft - 1 });
-    notifyPopup();
+    await setTimerState({ timeLeft: nextTime });
   }
 
-  // Re-schedule the next 1-second tick while still running.
+  const updated = await getTimerState();
+  await publishTeamStatus(updated);
+  await notifyPopup();
   startTicking();
 });
 
-// ==================== APPLY SYNCED DURATIONS ====================
-async function applySyncDurations() {
-  const { workMinutes = 25, breakMinutes = 5 } = await chrome.storage.sync.get(["workMinutes", "breakMinutes"]);
-  const workDuration = Math.max(1, workMinutes) * 60;
-  const breakDuration = Math.max(1, breakMinutes) * 60;
-  const state = await getState();
-  const update = { workDuration, breakDuration };
-  if (!state.isRunning) {
-    update.timeLeft = state.isWorkSession ? workDuration : breakDuration;
+let workspaceSocket = null;
+let workspaceSocketRetryAt = 0;
+
+async function refreshWorkspaceSocket() {
+  const workspace = await getWorkspaceState();
+  if (!workspace.enabled) {
+    if (workspaceSocket) workspaceSocket.close();
+    workspaceSocket = null;
+    return;
   }
-  await setState(update);
+  const syncConfig = await chrome.storage.sync.get({ workspaceSocketUrl: "" });
+  const url = syncConfig.workspaceSocketUrl;
+  if (!url) return;
+  if (workspaceSocket && workspaceSocket.readyState === WebSocket.OPEN) return;
+  if (Date.now() < workspaceSocketRetryAt) return;
+
+  try {
+    workspaceSocket = new WebSocket(url);
+    workspaceSocket.onopen = () => {
+      workspaceSocket.send(
+        JSON.stringify({ type: "join", workspaceCode: workspace.workspaceCode, displayName: workspace.displayName })
+      );
+    };
+    workspaceSocket.onmessage = async (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === "leaderboard_update") {
+          await chrome.storage.local.set({ workspaceLeaderboard: payload.data || [] });
+        }
+      } catch (_e) {}
+    };
+    workspaceSocket.onclose = () => {
+      workspaceSocketRetryAt = Date.now() + 5000;
+    };
+  } catch (_e) {
+    workspaceSocketRetryAt = Date.now() + 10000;
+  }
 }
 
-// ==================== MESSAGE HANDLING ====================
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
     switch (msg.type) {
-      case "start":
-        {
-          const state = await getState();
-          if (!state.isRunning) {
-            await setState({ isRunning: true });
-            startTicking();
-          }
-          sendResponse({ success: true });
+      case "start": {
+        const state = await getTimerState();
+        if (!state.isRunning) {
+          await setTimerState({ isRunning: true });
+          await updateSmartBlockingRules(true);
+          startTicking();
         }
+        sendResponse({ success: true });
         break;
+      }
       case "stop":
-        await setState({ isRunning: false });
+        await setTimerState({ isRunning: false });
         stopTicking();
         sendResponse({ success: true });
         break;
-      case "reset":
-        {
-          const state = await getState();
-          const newTime = state.isWorkSession ? state.workDuration : state.breakDuration;
-          await setState({ timeLeft: newTime, isRunning: false });
-          stopTicking();
-          sendResponse({ success: true });
-        }
+      case "reset": {
+        const state = await getTimerState();
+        await setTimerState({
+          isRunning: false,
+          timeLeft: state.isWorkSession ? state.workDuration : state.breakDuration
+        });
+        stopTicking();
+        sendResponse({ success: true });
         break;
+      }
       case "getState":
-        {
-          const state = await getState();
-          sendResponse({ success: true, state });
-        }
+        sendResponse({ success: true, state: await getTimerState() });
+        break;
+      case "setDurations":
+        await setTimerState({
+          workDuration: Number(msg.workDuration) || DEFAULT_WORK,
+          breakDuration: Number(msg.breakDuration) || DEFAULT_BREAK
+        });
+        sendResponse({ success: true });
         break;
       case "settings_updated":
         await applySyncDurations();
-        await updateDynamicRules();
+        await updateSmartBlockingRules((await getTimerState()).isWorkSession);
+        await refreshWorkspaceSocket();
         sendResponse({ success: true });
         break;
       case "getAnalytics":
-        {
-          const analytics = await getAnalytics();
-          sendResponse(analytics);
-        }
+        sendResponse(await getAnalytics());
         break;
       case "getFocusScore":
-        {
-          const score = await calculateFocusScore();
-          sendResponse(score);
+        sendResponse(await calculateFocusScore());
+        break;
+      case "record_focus_feedback":
+        await recordFocusFeedback(msg.payload || {});
+        sendResponse({ success: true });
+        break;
+      case "get_ai_summary":
+        sendResponse(await generateAiSummary());
+        break;
+      case "activate_license":
+        sendResponse(await activateLicense(msg.licenseKey));
+        break;
+      case "deactivate_license":
+        await deactivateLicense();
+        sendResponse({ success: true });
+        break;
+      case "premium_state":
+        sendResponse(await getPremiumState());
+        break;
+      case "workspace_create":
+        sendResponse(await createWorkspace(msg.displayName));
+        break;
+      case "workspace_join":
+        sendResponse(await joinWorkspace(msg.workspaceCode, msg.displayName));
+        break;
+      case "workspace_leave":
+        await leaveWorkspace();
+        sendResponse({ success: true });
+        break;
+      case "workspace_leaderboard":
+        sendResponse(await fetchWorkspaceLeaderboard());
+        break;
+      case "get_pro_settings":
+        sendResponse(await getProSettings());
+        break;
+      case "set_pro_settings":
+        sendResponse(await setProSettings(msg.settings || {}));
+        break;
+      case "export_backup":
+        sendResponse(await chrome.storage.local.get(null));
+        break;
+      case "import_backup":
+        if (msg.payload && typeof msg.payload === "object") {
+          await chrome.storage.local.set(msg.payload);
+          sendResponse({ success: true });
+        } else {
+          sendResponse({ success: false, error: "Invalid payload" });
         }
         break;
       default:
-        sendResponse({ success: false, error: "Unknown type" });
+        sendResponse({ success: false, error: "Unknown message type" });
     }
-    notifyPopup();
+    await notifyPopup();
   })();
   return true;
 });
 
-// ==================== INIT ====================
 async function init() {
   await applySyncDurations();
-  await updateDynamicRules();
-  const state = await getState();
-  if (state.isRunning) startTicking();
+  await updateSmartBlockingRules((await getTimerState()).isWorkSession);
+  await refreshWorkspaceSocket();
+  chrome.alarms.create(KEEP_ALIVE_ALARM, { periodInMinutes: 0.5 });
+  const timer = await getTimerState();
+  if (timer.isRunning) startTicking();
 }
+
 chrome.runtime.onInstalled.addListener(init);
 init();

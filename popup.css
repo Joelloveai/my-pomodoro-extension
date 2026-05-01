@@ -1,128 +1,32 @@
-body {
-    margin: 0;
-    width: 360px;
-    background: #1e1e2e;
-    color: #e6e6e6;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  }
-  
-  .container {
-    padding: 14px;
-  }
-  
-  .stats-dashboard {
-    display: flex;
-    justify-content: space-between;
-    background: #2a2a3d;
-    border-radius: 16px;
-    padding: 8px 12px;
-    margin-bottom: 16px;
-    gap: 8px;
-  }
-  
-  .stat-card {
-    text-align: center;
-    flex: 1;
-  }
-  
-  .stat-label {
-    font-size: 11px;
-    color: #aaa;
-    display: block;
-  }
-  
-  .stat-value {
-    font-size: 20px;
-    font-weight: bold;
-    display: block;
-    margin-top: 4px;
-  }
-  
-  .timer {
-    font-family: 'Courier New', monospace;
-    font-size: 56px;
-    text-align: center;
-    margin: 10px 0;
-    letter-spacing: 2px;
-    font-weight: bold;
-  }
-  
-  .controls {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-  
-  button {
-    background: #2a2a3d;
-    border: 1px solid #66ff99;
-    color: #66ff99;
-    border-radius: 10px;
-    padding: 6px 12px;
-    cursor: pointer;
-    font-weight: bold;
-    transition: 0.2s;
-  }
-  
-  button:hover {
-    background: #3a3a55;
-    transform: scale(0.98);
-  }
-  
-  .controls button {
-    flex: 1;
-  }
-  
-  .task-section {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 6px;
-    margin-top: 8px;
-  }
-  
-  #taskInput {
-    background: #141422;
-    border: 1px solid #3a3a55;
-    color: white;
-    border-radius: 8px;
-    padding: 8px;
-    font-size: 12px;
-  }
-  
-  #taskList {
-    grid-column: 1 / -1;
-    list-style: none;
-    margin: 8px 0 0;
-    padding: 0;
-    max-height: 180px;
-    overflow-y: auto;
-  }
-  
-  .task-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #141422;
-    border-radius: 8px;
-    padding: 6px 10px;
-    margin-bottom: 6px;
-  }
-  
-  .task-item.completed {
-    opacity: 0.6;
-    text-decoration: line-through;
-  }
-  
-  .task-buttons {
-    display: flex;
-    gap: 8px;
-  }
-  
-  .task-btn {
-    background: none;
-    border: none;
-    color: #66ff99;
-    padding: 2px 6px;
-    font-size: 11px;
-    cursor: pointer;
-  }
+:root {
+  --bg: #1e1e2e;
+  --card: #25253a;
+  --text: #f4f5f7;
+  --accent: #66ff99;
+  --muted: #95a5a6;
+}
+body { margin: 0; width: 320px; background: var(--bg); color: var(--text); font-family: Inter, "Segoe UI", Arial, sans-serif; }
+.container { padding: 12px; }
+.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.header h1 { margin: 0; font-size: 15px; }
+.badge { margin: 2px 0 0; color: var(--muted); font-size: 11px; }
+.stats-dashboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.stat-card { background: var(--card); border-radius: 10px; padding: 8px; text-align: center; font-size: 11px; }
+.stat-card strong { display: block; margin-top: 4px; font-size: 18px; }
+.timer { text-align: center; font-family: "Courier New", monospace; font-size: 48px; margin: 10px 0; }
+.controls { display: flex; gap: 8px; }
+button { border: 1px solid var(--accent); background: transparent; color: var(--accent); border-radius: 8px; padding: 7px 10px; cursor: pointer; }
+.controls button { flex: 1; }
+.ghost { border: none; color: var(--muted); padding: 4px 6px; }
+.task-section { margin-top: 10px; display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+#taskInput { background: #131320; color: var(--text); border: 1px solid #383856; border-radius: 8px; padding: 8px; }
+#taskList { grid-column: 1 / -1; list-style: none; margin: 0; padding: 0; max-height: 130px; overflow: auto; }
+.task-item { display: flex; justify-content: space-between; align-items: center; background: var(--card); border-radius: 8px; padding: 6px 8px; margin-top: 6px; }
+.task-item.completed { opacity: 0.6; text-decoration: line-through; }
+.task-buttons { display: flex; gap: 4px; }
+.task-btn { padding: 4px 6px; border-radius: 6px; font-size: 11px; }
+.footer { display: flex; justify-content: center; gap: 8px; margin-top: 8px; }
+.tip { display: none; font-size: 12px; padding: 8px; background: #2a2a40; border-radius: 8px; margin-top: 8px; }
+.feedback { margin-top: 8px; background: #2a2a40; border-radius: 8px; padding: 8px; }
+.feedback p { margin: 0 0 6px; font-size: 12px; }
+.hidden { display: none; }

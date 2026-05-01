@@ -7,45 +7,45 @@
 </head>
 <body>
   <div class="container">
-    <!-- Dashboard -->
-    <div class="stats-dashboard">
-      <div class="stat-card">
-        <span class="stat-label">🍅 Today</span>
-        <span class="stat-value" id="sessionsToday">0</span>
+    <header class="header">
+      <div>
+        <h1>Focus Pomodoro</h1>
+        <p id="proBadge" class="badge">Free</p>
       </div>
-      <div class="stat-card">
-        <span class="stat-label">⏱️ Focus min</span>
-        <span class="stat-value" id="focusMinutes">0</span>
-      </div>
-      <div class="stat-card">
-        <span class="stat-label" id="motivationMsg">✨ Ready?</span>
-      </div>
-    </div>
+      <button id="openDashboardBtn" class="ghost">Dashboard</button>
+    </header>
 
-    <!-- Timer -->
+    <section class="stats-dashboard">
+      <div class="stat-card"><span>Today</span><strong id="sessionsToday">0</strong></div>
+      <div class="stat-card"><span>Minutes</span><strong id="focusMinutes">0</strong></div>
+      <div class="stat-card"><span id="motivationMsg">Ready</span></div>
+    </section>
+
     <div class="timer" id="timer">25:00</div>
     <div class="controls">
-      <button id="startBtn">▶ Start</button>
-      <button id="pauseBtn">⏸ Pause</button>
-      <button id="resetBtn">⟳ Reset</button>
+      <button id="startBtn">Start</button>
+      <button id="pauseBtn">Pause</button>
+      <button id="resetBtn">Reset</button>
     </div>
 
-    <!-- Break suggestion (hidden until break starts) -->
-    <div id="breakSuggestion" style="display:none; background:#2a2a3d; padding:6px; border-radius:8px; margin:8px 0; font-size:12px;">
-      💡 <span id="suggestionText"></span>
+    <div id="breakSuggestion" class="tip">
+      <span id="suggestionText"></span>
     </div>
 
-    <!-- Task section -->
-    <div class="task-section">
+    <section class="task-section">
       <input type="text" id="taskInput" placeholder="What are you working on?">
-      <button id="addTaskBtn">+ Add</button>
+      <button id="addTaskBtn">Add</button>
       <ul id="taskList"></ul>
+    </section>
+
+    <div class="footer">
+      <button id="exportBtn" class="ghost">Export CSV</button>
+      <button id="optionsLink" class="ghost">Options</button>
     </div>
 
-    <!-- Footer links -->
-    <div style="margin-top: 12px; text-align: center; font-size: 11px;">
-      <button id="exportBtn" style="background:none; border:none; color:#66ff99; cursor:pointer;">📥 Export CSV</button>
-      <a href="#" id="optionsLink" style="color:#66ff99; margin-left: 8px;">⚙️ Options</a>
+    <div id="feedbackPrompt" class="feedback hidden">
+      <p>How focused were you? (1-5)</p>
+      <div id="ratingButtons"></div>
     </div>
   </div>
   <script src="popup.js"></script>

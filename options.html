@@ -2,118 +2,148 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Focus Pomodoro Options</title>
+  <title>Focus Pomodoro Control Center</title>
   <style>
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      margin: 30px;
-      max-width: 500px;
-      background: #f8f9fa;
-    }
-    .card {
-      background: white;
-      border-radius: 20px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    }
-    h2 {
-      margin-top: 0;
-    }
-    .input-group {
-      margin-bottom: 20px;
-    }
-    label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-    input[type="number"] {
-      width: 100px;
-      padding: 6px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-    }
-    .flex-row {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
-    #blocked-list {
-      list-style: none;
-      padding: 0;
-      margin: 10px 0;
-    }
-    #blocked-list li {
-      background: #f1f3f5;
-      margin: 6px 0;
-      padding: 6px 12px;
-      border-radius: 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    button {
-      background: #2c3e66;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      padding: 6px 14px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #1e2a4a;
-    }
-    .message {
-      margin-top: 12px;
-      font-size: 14px;
-    }
-    .score-box {
-      background: #e9ecef;
-      border-radius: 16px;
-      padding: 12px;
-      text-align: center;
-    }
+    :root { color-scheme: light dark; }
+    body { font-family: Inter, system-ui, Arial, sans-serif; margin: 24px auto; max-width: 980px; background: #f6f8fa; color: #111; }
+    h1 { margin: 0 0 16px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
+    .card h2 { margin: 0 0 10px; font-size: 16px; }
+    .input-group { margin-bottom: 10px; }
+    label { display: block; font-size: 12px; color: #374151; margin-bottom: 4px; }
+    input, select { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #d1d5db; border-radius: 8px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .inline { display: flex; gap: 8px; align-items: center; }
+    .inline > * { flex: 1; }
+    button { border: none; border-radius: 8px; padding: 8px 10px; background: #111827; color: #fff; cursor: pointer; }
+    button.secondary { background: #4b5563; }
+    button.link { background: transparent; color: #2563eb; padding: 0; }
+    ul { list-style: none; padding: 0; margin: 8px 0 0; max-height: 140px; overflow: auto; }
+    li { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px 8px; margin-top: 6px; }
+    .message { margin-top: 10px; font-size: 13px; color: #065f46; }
+    .wide { grid-column: 1 / -1; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h2>⚙️ Focus Pomodoro Settings</h2>
-
-    <div class="input-group">
-      <label>🍅 Work duration (minutes)</label>
-      <input type="number" id="work-minutes" min="1" max="180" value="25">
-    </div>
-
-    <div class="input-group">
-      <label>☕ Break duration (minutes)</label>
-      <input type="number" id="break-minutes" min="1" max="60" value="5">
-    </div>
-
-    <div class="input-group">
-      <label>🔇 Sound notifications</label>
-      <div class="flex-row">
-        <label style="font-weight: normal;"><input type="radio" name="sound" value="on" checked> On</label>
-        <label style="font-weight: normal;"><input type="radio" name="sound" value="off"> Off</label>
+  <h1>Focus Pomodoro - Settings & Pro</h1>
+  <div class="grid">
+    <section class="card">
+      <h2>Core Settings</h2>
+      <div class="row">
+        <div class="input-group">
+          <label>Work minutes</label>
+          <input type="number" id="work-minutes" min="1" max="180" value="25">
+        </div>
+        <div class="input-group">
+          <label>Break minutes</label>
+          <input type="number" id="break-minutes" min="1" max="60" value="5">
+        </div>
       </div>
-    </div>
+      <div class="input-group">
+        <label>Sound notifications</label>
+        <select id="sound-enabled">
+          <option value="on">On</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+      <button id="save-core">Save Core Settings</button>
+      <div class="message" id="core-message"></div>
+    </section>
 
-    <div class="input-group">
-      <label>🚫 Blocked websites (e.g., youtube.com)</label>
-      <div class="flex-row">
-        <input type="text" id="blocked-site" placeholder="example.com" style="flex:1">
+    <section class="card">
+      <h2>Smart Blocking</h2>
+      <div class="inline">
+        <input type="text" id="blocked-site" placeholder="youtube.com">
         <button id="add-blocked">Add</button>
       </div>
       <ul id="blocked-list"></ul>
-    </div>
+      <div class="input-group">
+        <label>AI strictness</label>
+        <select id="strictness">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+      </div>
+      <div class="inline">
+        <label><input type="checkbox" id="toggle-smart-blocking"> Enable smart blocking (Pro)</label>
+      </div>
+    </section>
 
-    <button id="save-btn">Save Settings</button>
-    <div class="message" id="message"></div>
-  </div>
+    <section class="card">
+      <h2>Premium & Licensing</h2>
+      <p>Status: <strong id="premium-state">Free</strong></p>
+      <div class="inline">
+        <input type="text" id="license-key" placeholder="FPRO-ABCD-1234-00000">
+        <button id="activate-license">Activate</button>
+      </div>
+      <div class="inline" style="margin-top:8px;">
+        <button id="deactivate-license" class="secondary">Deactivate</button>
+        <button id="upgrade-btn">Upgrade to Pro</button>
+      </div>
+      <div class="message" id="license-message"></div>
+    </section>
 
-  <div class="card score-box">
-    🔥 Your Focus Score: <strong id="focus-score">0</strong>/100
-    <div style="font-size:12px; margin-top:6px;">Based on last 30 days of completed Pomodoros and streaks.</div>
+    <section class="card">
+      <h2>Workspace (Team)</h2>
+      <div class="inline">
+        <input type="text" id="workspace-name" placeholder="Your display name">
+        <button id="workspace-create">Create</button>
+      </div>
+      <div class="inline" style="margin-top:8px;">
+        <input type="text" id="workspace-code" placeholder="Workspace code">
+        <button id="workspace-join">Join</button>
+      </div>
+      <div class="inline" style="margin-top:8px;">
+        <button id="workspace-leave" class="secondary">Leave</button>
+        <button id="workspace-refresh">Refresh Leaderboard</button>
+      </div>
+      <ul id="workspace-leaderboard"></ul>
+    </section>
+
+    <section class="card wide">
+      <h2>Pro Integrations</h2>
+      <div class="row">
+        <div class="input-group"><label><input type="checkbox" id="toggle-ai-coach"> AI coach</label></div>
+        <div class="input-group"><label><input type="checkbox" id="toggle-dashboard"> Advanced dashboard</label></div>
+        <div class="input-group"><label><input type="checkbox" id="toggle-slack"> Slack</label><input id="slack-webhook" placeholder="Slack webhook URL"></div>
+        <div class="input-group"><label><input type="checkbox" id="toggle-notion"> Notion</label><input id="notion-api-key" placeholder="Notion API key"></div>
+        <div class="input-group"><label>Notion database ID</label><input id="notion-db-id" placeholder="Database ID"></div>
+        <div class="input-group"><label><input type="checkbox" id="toggle-zapier"> Zapier</label><input id="zapier-webhook" placeholder="Zapier webhook URL"></div>
+        <div class="input-group"><label><input type="checkbox" id="toggle-calendar"> Google Calendar webhook</label><input id="calendar-webhook" placeholder="Calendar webhook URL"></div>
+        <div class="input-group"><label>Workspace WebSocket URL</label><input id="workspace-socket-url" placeholder="wss://..."></div>
+      </div>
+      <button id="save-pro">Save Pro Settings</button>
+      <div class="message" id="pro-message"></div>
+    </section>
+
+    <section class="card wide">
+      <h2>Cloud & Backup</h2>
+      <div class="row">
+        <div class="input-group"><label>Firebase database URL</label><input id="firebase-db-url" placeholder="https://your-project-default-rtdb.firebaseio.com"></div>
+        <div class="input-group"><label>Firebase API key</label><input id="firebase-api-key" placeholder="AIza..."></div>
+      </div>
+      <div class="inline">
+        <label><input type="checkbox" id="firebase-enabled"> Enable Firebase sync</label>
+        <label><input type="checkbox" id="toggle-cloud-backup"> Enable cloud backup (Pro)</label>
+      </div>
+      <div class="inline" style="margin-top:8px;">
+        <input id="backup-passphrase" type="password" placeholder="Backup passphrase">
+        <button id="export-backup">Export Encrypted Backup</button>
+        <button id="import-backup" class="secondary">Import Backup</button>
+      </div>
+      <input id="backup-file" type="file" accept=".json" style="display:none;">
+      <div class="message" id="backup-message"></div>
+    </section>
+
+    <section class="card wide">
+      <h2>Insights</h2>
+      <p>Focus score: <strong id="focus-score">0</strong>/100</p>
+      <button id="open-dashboard">Open Full Dashboard</button>
+      <button id="open-diagnostics" class="secondary">Open Diagnostics</button>
+    </section>
   </div>
 
   <script src="options.js"></script>
