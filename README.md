@@ -1,4 +1,4 @@
-# Focus Pomodoro (Pro Architecture)
+# Focus Pomodoro 
 
 Production-ready Chrome extension foundation with offline timer, premium gating, workspace sync, AI coaching summaries, integrations, dashboard analytics, and diagnostics.
 
